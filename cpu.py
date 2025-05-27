@@ -41,47 +41,72 @@ class CPU:
         else:
             raise Exception("Unknown instruction type")
 
-    def execute_r_type(self, instr):
-        funct = instr['funct']
-        rs = instr['rs']
-        rt = instr['rt']
-        rd = instr['rd']
+   def execute_r_type(self, instr):
+    funct = instr['funct']
+    rs = instr['rs']
+    rt = instr['rt']
+    rd = instr['rd']
+    shamt = instr.get('shamt', 0)  # Shift amount is used for sll and srl
 
-        if funct == 0x20:  # ADD
-            self.registers[rd] = self.registers[rs] + self.registers[rt]
-        elif funct == 0x22:  # SUB
-            self.registers[rd] = self.registers[rs] - self.registers[rt]
-        elif funct == 0x0C:  # HALT (assuming HALT is a custom R-type funct code)
-            self.running = False
-        else:
-            raise Exception(f"Unsupported R-type funct code: {hex(funct)}")
+    if funct == 0x20:  # ADD
+        self.registers[rd] = self.registers[rs] + self.registers[rt]
+    elif funct == 0x22:  # SUB
+        self.registers[rd] = self.registers[rs] - self.registers[rt]
+    elif funct == 0x24:  # AND
+        self.registers[rd] = self.registers[rs] & self.registers[rt]
+    elif funct == 0x25:  # OR
+        self.registers[rd] = self.registers[rs] | self.registers[rt]
+    elif funct == 0x2A:  # SLT (Set on Less Than)
+        self.registers[rd] = int(self.registers[rs] < self.registers[rt])
+    elif funct == 0x00:  # SLL (Shift Left Logical)
+        self.registers[rd] = self.registers[rt] << shamt
+    elif funct == 0x02:  # SRL (Shift Right Logical)
+        self.registers[rd] = (self.registers[rt] & 0xFFFFFFFF) >> shamt
+    elif funct == 0x0C:  # HALT (assuming HALT is a custom R-type funct code)
+        self.running = False
+    else:
+        raise Exception(f"Unsupported R-type funct code: {hex(funct)}")
 
-        self.pc += 4
-        self.instruction_count[funct] = self.instruction_count.get(funct, 0) + 1
+    self.pc += 4
+    self.instruction_count[funct] = self.instruction_count.get(funct, 0) + 1
+
 
     def execute_I_type(self, instr):
-        opcode = instr['opcode']
-        rs = instr['rs']
-        rt = instr['rt']
-        imm = instr['immediate']
+    opcode = instr['opcode']
+    rs = instr['rs']
+    rt = instr['rt']
+    imm = instr['immediate']
 
-        if opcode == 0x08:  # ADDI
-            self.registers[rt] = self.registers[rs] + imm
-        elif opcode == 0x04:  # BEQ
-            if self.registers[rs] == self.registers[rt]:
-                self.pc += 4 + (imm << 2)
-                return
-        elif opcode == 0x23:  # LW
-            address = self.registers[rs] + imm
-            self.registers[rt] = self.memory[address // 4]
-        elif opcode == 0x2B:  # SW
-            address = self.registers[rs] + imm
-            self.memory[address // 4] = self.registers[rt]
-        else:
-            raise Exception(f"Unsupported I-type opcode: {hex(opcode)}")
+    if opcode == 0x08:  # ADDI
+        self.registers[rt] = self.registers[rs] + imm
+    elif opcode == 0x0C:  # ANDI
+        self.registers[rt] = self.registers[rs] & (imm & 0xFFFF)
+    elif opcode == 0x0D:  # ORI
+        self.registers[rt] = self.registers[rs] | (imm & 0xFFFF)
+    elif opcode == 0x0A:  # SLTI
+        self.registers[rt] = int(self.registers[rs] < imm)
+    elif opcode == 0x05:  # BNE
+        if self.registers[rs] != self.registers[rt]:
+            self.pc += 4 + (imm << 2)
+            return
+    elif opcode == 0x0F:  # LUI
+        self.registers[rt] = (imm & 0xFFFF) << 16
+    elif opcode == 0x04:  # BEQ
+        if self.registers[rs] == self.registers[rt]:
+            self.pc += 4 + (imm << 2)
+            return
+    elif opcode == 0x23:  # LW
+        address = self.registers[rs] + imm
+        self.registers[rt] = self.memory[address // 4]
+    elif opcode == 0x2B:  # SW
+        address = self.registers[rs] + imm
+        self.memory[address // 4] = self.registers[rt]
+    else:
+        raise Exception(f"Unsupported I-type opcode: {hex(opcode)}")
 
-        self.pc += 4
-        self.instruction_count[opcode] = self.instruction_count.get(opcode, 0) + 1
+    self.pc += 4
+    self.instruction_count[opcode] = self.instruction_count.get(opcode, 0) + 1
+
 
     def execute_J_type(self, instr):
         opcode = instr['opcode']
